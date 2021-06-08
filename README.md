@@ -13,3 +13,5 @@ It ads kill counter, high score and sound effects.
 * some resistors
 
 ## Assembly
+
+![LCD menu sample](https://raw.githubusercontent.com/Saur0o0n/pidkiln/master/Documentation/images/PIDKiln_LCD_sample2.png)
