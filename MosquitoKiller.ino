@@ -173,6 +173,7 @@ bool cur_butt_state;
 
 void setup(void){
 
+  delay(1200); // this is to make my nano boot from external power (https://forum.arduino.cc/t/nano-requires-manual-reset-when-not-connected-to-computer/495587/15)
   Serial.begin(115200);
   Serial.println("Fight!");
   randomSeed(analogRead(0));
