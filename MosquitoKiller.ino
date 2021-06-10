@@ -10,27 +10,37 @@
 #include <EEPROM.h>
 
 SoftwareSerial mySoftwareSerial(10, 9); // RX, TX
+const byte zapButtonPin = 12;  // ping where we read zap enable button
+const byte menuButtonPin1 = 8; // menu button pin
+
 DFRobotDFPlayerMini myDFPlayer;
 void printDetail(uint8_t type, int value);
-const byte mp3_1 = 14;  // start
-const byte mp3_2 = 13;  // stop
-const byte mp3_3 = 10; // victory
-const byte mp3_4 = 0;  // go one move your ass (when there is no killing)
+const uint8_t mp3_1 = 14; // start
+const uint8_t mp3_2 = 13; // stop
+const uint8_t mp3_3 = 10; // victory
+const uint8_t mp3_4 = 0;  // go one move your ass (when there is no killing)
 
 const byte kill_sound_cnt = 7;  // how often should hear kill sound (random(kill_sound_cnt))
 // Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
 Adafruit_ADS1015 ads;     /* Use this for the 12-bit version */
 
-const byte buttonPin = 12;
-bool old_butt_state = 0;
-uint8_t butt_hist = 0, butt_cnt = 0;
+bool old_zap_butt_state = 0;
+uint8_t zap_butt_hist = 0, zap_butt_cnt = 0;
+
+const uint16_t menu_button_short = 900; // how long (ms) is short press, everything above is long press
+uint32_t menu_button_time = 0;  // when was last time menu button was pressed (to count long/short presses)
+
 uint16_t mosq_kills = 0;
 uint16_t high_score = 0;
 uint8_t next_kill_audio = 0;
 uint8_t eeprom_cell = 10;
 const uint16_t eeprom_code = "12345";   // this is awqard way to find out if this is the first run at all
-const uint8_t kill_grace_period = 700;  // Kill will be counted every 0,7s
-uint16_t last_kill = millis();
+const uint16_t kill_grace_period = 700;  // Kill will be counted every 0,7s
+const uint16_t kill_combo_threshold = 1500;  // window where next kill is counted for combo
+
+uint32_t last_kill = millis();
+
+bool prefs_audio = 1; // audio on/off
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 32 // OLED display height, in pixels
@@ -87,12 +97,12 @@ void power_off(){
   display.println(high_score);
   display.display();
   
-  myDFPlayer.playFolder(2,random(mp3_2));
+  if(prefs_audio) myDFPlayer.playFolder(2,random(mp3_2));
 }
 
 void power_on(){
   Serial.println("Power ON!");
-  myDFPlayer.playFolder(1,random(mp3_1));
+  if(prefs_audio) myDFPlayer.playFolder(1,random(mp3_1));
   
   display.clearDisplay();
   display.setTextSize(3);
@@ -105,7 +115,7 @@ void display_kills(){
   display.clearDisplay();
   display.setTextSize(2);
   display.setTextColor(WHITE); 
-  display.drawRect(1, 1, 126, 30, WHITE);
+  display.drawRect(1, 1, 127, 31, WHITE);
   display.setCursor(6,7);
   display.print("Kills: ");
   display.println(mosq_kills);
@@ -121,53 +131,94 @@ void display_kills(){
 }
 
 
-// Check if the power button is pressed and debounce it
-bool check_button(){
-bool cur_butt_state;
+// Menu short press
+void menu_short_press(){
+  Serial.println("Short press");
+}
 
-  cur_butt_state = digitalRead(buttonPin);
+//
+void menu_long_press(){
+  Serial.println("Long press");
+  prefs_audio=!prefs_audio;
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setCursor(7,10);
+  if(prefs_audio) display.println("Audio on");
+  else display.println("Audio off");
+  display.display();
+}
+
+// Proceed menu button(s)
+void check_menu(){
+bool cur_menu_butt1_state;
+
+  cur_menu_butt1_state = digitalRead(menuButtonPin1);
+  //Serial.println(cur_menu_butt1_state); delay(100);
+  if(cur_menu_butt1_state){   // button not pressed or released
+    if(menu_button_time!=0){  // button released
+      if(menu_button_time+menu_button_short>millis()){  // short press
+        menu_short_press();
+      }else{  // long press
+        menu_long_press();
+      }
+      delay(100); // poors man debounce ;)
+      menu_button_time=0;
+    }
+    return;
+  }else{  // button pressed
+    if(menu_button_time==0) menu_button_time=millis();
+  }
+}
+
+
+
+// Check if the power button is pressed and debounce it
+bool check_zap_button(){
+bool cur_zap_butt_state;
+
+  cur_zap_butt_state = digitalRead(zapButtonPin);
   
-  //Serial.println(cur_butt_state);
+  //Serial.println(cur_zap_butt_state);
   //delay(100);
 
 
 // If the button state has changed - work on it's history
-  if(cur_butt_state != old_butt_state && butt_cnt==0){
-    butt_hist=(byte)cur_butt_state;
-    butt_cnt=1;
+  if(cur_zap_butt_state != old_zap_butt_state && zap_butt_cnt==0){
+    zap_butt_hist=(byte)cur_zap_butt_state;
+    zap_butt_cnt=1;
     //Serial.println("Start debounce");
-    return old_butt_state;
+    return old_zap_butt_state;
   }
 
 // We are debouncing...
-  if(butt_cnt>0){
-    if(butt_cnt>10){    // finish debounce
-      if(butt_hist<4){
-        cur_butt_state=0;
-        butt_cnt=0;
-      }else if(butt_hist>6){
-        cur_butt_state=1;
-        butt_cnt=0;
+  if(zap_butt_cnt>0){
+    if(zap_butt_cnt>10){    // finish debounce
+      if(zap_butt_hist<4){
+        cur_zap_butt_state=0;
+        zap_butt_cnt=0;
+      }else if(zap_butt_hist>6){
+        cur_zap_butt_state=1;
+        zap_butt_cnt=0;
       }else{ // debounce failed
-        butt_cnt=1;
-        butt_hist=(byte)cur_butt_state;
-        return old_butt_state;  // return previous value until manage to debounce 
+        zap_butt_cnt=1;
+        zap_butt_hist=(byte)cur_zap_butt_state;
+        return old_zap_butt_state;  // return previous value until manage to debounce 
       }
     }else{
-      butt_hist+=cur_butt_state;
-      butt_cnt++;
-      return old_butt_state;  // return previous value until we debounce 
+      zap_butt_hist+=cur_zap_butt_state;
+      zap_butt_cnt++;
+      return old_zap_butt_state;  // return previous value until we debounce 
     }
   }
 
-  if(cur_butt_state>old_butt_state){
+  if(cur_zap_butt_state>old_zap_butt_state){
     power_on();
-  }else if(cur_butt_state<old_butt_state){
+  }else if(cur_zap_butt_state<old_zap_butt_state){
     power_off();
   }
-  old_butt_state=cur_butt_state;
+  old_zap_butt_state=cur_zap_butt_state;
   
-  return old_butt_state;
+  return old_zap_butt_state;
 }
 
 
@@ -177,8 +228,9 @@ void setup(void){
   Serial.begin(115200);
   Serial.println("Fight!");
   randomSeed(analogRead(0));
-  
   next_kill_audio = random(1,kill_sound_cnt);
+
+  pinMode(menuButtonPin1, INPUT_PULLUP);
   
   mySoftwareSerial.begin(9600);
   
@@ -186,7 +238,7 @@ void setup(void){
   display.clearDisplay();
   display.setTextSize(1.6);
   display.setTextColor(WHITE); 
-  display.drawRect(1, 1, 126, 30, WHITE);
+  display.drawRect(1, 1, 127, 31, WHITE);
   display.setCursor(7,7);
   display.println("* Mosquito Killer *");
   display.setCursor(13,17);
@@ -202,21 +254,24 @@ void setup(void){
 //    }
   }
   Serial.println(F("DFPlayer Mini online."));
-  myDFPlayer.volume(25);  //Set volume value. From 0 to 30
-
+  myDFPlayer.volume(15);  //Set volume value. From 0 to 30
+//  if(prefs_audio) myDFPlayer.playFolder(5,1);
   restore_score();
   
   Serial.println("Getting differential reading from AIN0 (P) and AIN1 (N)");
   Serial.println("ADC Range: +/- 6.144V (1 bit = 3mV/ADS1015, 0.1875mV/ADS1115)");
-  pinMode(buttonPin, INPUT);
+  pinMode(zapButtonPin, INPUT);
   ads.begin();
   
 }
 
+
 void loop(void){
 int16_t results;
 
-  if(!check_button()) return;
+  check_menu();
+  
+  if(!check_zap_button()) return; // if the zap button is not pressed - we no need to go further
 
   /* Be sure to update this value based on the IC and the gain settings! */
   float   multiplier = 3.0F;    /* ADS1015 @ +/- 6.144V gain (12-bit results) */
