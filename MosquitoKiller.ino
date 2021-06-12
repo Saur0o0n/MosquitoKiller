@@ -33,14 +33,18 @@ uint32_t menu_button_time = 0;  // when was last time menu button was pressed (t
 uint16_t mosq_kills = 0;
 uint16_t high_score = 0;
 uint8_t next_kill_audio = 0;
-uint8_t eeprom_cell = 10;
-const uint16_t eeprom_code = "12345";   // this is awqard way to find out if this is the first run at all
 const uint16_t kill_grace_period = 700;  // Kill will be counted every 0,7s
 const uint16_t kill_combo_threshold = 1500;  // window where next kill is counted for combo
-
+uint8_t kombo_kill_count = 0; // how much killed in a row
 uint32_t last_kill = millis();
 
+/*
+ * Preferences (kind off ;) )
+*/
 bool prefs_audio = 1; // audio on/off
+uint8_t eeprom_cell = 10;
+const uint16_t eeprom_code = "12345";   // this is awqard way to find out if this is the first run at all
+
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
 #define SCREEN_HEIGHT 32 // OLED display height, in pixels
@@ -54,7 +58,8 @@ bool prefs_audio = 1; // audio on/off
 #define SCREEN_ADDRESS 0x3C ///< See datasheet for Address; 0x3D for 128x64, 0x3C for 128x32
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
 
-int16_t max_val=10;
+int16_t max_val=10; // max voltage value (not in volts) - reset after each hit
+int16_t total_max_val=10;  // max value total - to measure charging
 
 // Record top score in eeprom
 void remember_score(){
@@ -136,7 +141,7 @@ void menu_short_press(){
   Serial.println("Short press");
 }
 
-//
+// Process long press
 void menu_long_press(){
   Serial.println("Long press");
   prefs_audio=!prefs_audio;
@@ -148,7 +153,7 @@ void menu_long_press(){
   display.display();
 }
 
-// Proceed menu button(s)
+// Process menu button(s)
 void check_menu(){
 bool cur_menu_butt1_state;
 
@@ -170,6 +175,20 @@ bool cur_menu_butt1_state;
   }
 }
 
+
+// Process mosquito kill
+void kill_mosquito(){
+uint32_t new_kill=millis();
+
+  mosq_kills++;
+  if(last_kill+kill_combo_threshold>new_kill){  // check if we have a combo?
+    kombo_kill_count++;
+  }else{
+    kombo_kill_count=0;
+  }
+  display_kills();
+  last_kill = new_kill;
+}
 
 
 // Check if the power button is pressed and debounce it
@@ -222,6 +241,9 @@ bool cur_zap_butt_state;
 }
 
 
+/*
+** Initialize all stuff - arduino style
+*/
 void setup(void){
 
   delay(1200); // this is to make my nano boot from external power (https://forum.arduino.cc/t/nano-requires-manual-reset-when-not-connected-to-computer/495587/15)
@@ -266,6 +288,7 @@ void setup(void){
 }
 
 
+
 void loop(void){
 int16_t results;
 
@@ -281,14 +304,15 @@ int16_t results;
   if(results>max_val){
     max_val=results;
     //Serial.print(".. setting new max"); Serial.println(max_val);
-    delay(100);
+    //delay(100);
+    if(max_val>total_max_val) total_max_val=max_val;
   }
 
-  if(results<(max_val*0.8) && max_val>100 && (last_kill+kill_grace_period)<millis()){
-    Serial.print("Kill! maxV:"); Serial.print(max_val); Serial.print(" res:"); Serial.print(results); Serial.print("("); Serial.print(results * multiplier); Serial.println("mV)");
-    max_val=results;
-    mosq_kills++;
-    display_kills();
-    last_kill = millis();
+  if(results<(max_val*0.8) && max_val>100){ // we have discharge
+    if((last_kill+kill_grace_period)<millis()){  // if we pass grace perdiod (not a chain discharge)
+      Serial.print("Kill! maxV:"); Serial.print(max_val); Serial.print(" res:"); Serial.print(results); Serial.print("("); Serial.print(results * multiplier); Serial.println("mV)");
+      kill_mosquito();
+    }
+    max_val=results;  // despite if it's chain or not - we update current voltage value
   }
 }
