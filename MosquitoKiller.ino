@@ -15,12 +15,13 @@ const byte menuButtonPin1 = 8; // menu button pin
 
 DFRobotDFPlayerMini myDFPlayer;
 void printDetail(uint8_t type, int value);
-const uint8_t mp3_1 = 14; // start
-const uint8_t mp3_2 = 13; // stop
-const uint8_t mp3_3 = 10; // victory
-const uint8_t mp3_4 = 0;  // go one move your ass (when there is no killing)
+const uint8_t mp3_1 = 15; // (+1) start
+const uint8_t mp3_2 = 13; // (+1) stop
+const uint8_t mp3_3 = 5;  // (+1) victory
+const uint8_t mp3_4 = 6;  // (+1) combo sound
+const uint8_t mp3_5 = 8;  // (+1) go on and move your ass sounds (when there is no killing)
 
-const byte kill_sound_cnt = 7;  // how often should hear kill sound (random(kill_sound_cnt))
+const byte kill_sound_cnt = 15;  // how often should hear kill sound (random(kill_sound_cnt))
 // Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
 Adafruit_ADS1015 ads;     /* Use this for the 12-bit version */
 
@@ -38,12 +39,16 @@ const uint16_t kill_combo_threshold = 1500;  // window where next kill is counte
 uint8_t kombo_kill_count = 0; // how much killed in a row
 uint32_t last_kill = millis();
 
+uint32_t next_sentence = 0;  // if "player" is doing nothing, play something not too often
+
+const uint32_t min_delay_for_sentence = 60000;  // Some minimal delay, like 60s
+const uint32_t max_delay_for_sentence = 1200000; // And maximum delay - like 20min
 /*
  * Preferences (kind off ;) )
 */
 bool prefs_audio = 1; // audio on/off
 int eeprom_cell = 10;
-const uint16_t eeprom_code = 22345;   // this is awkward way to find out if this is the first run at all, put here unique value in range 0...65535
+const uint16_t eeprom_code = 12345;   // this is awkward way to find out if this is the first run at all, put here unique value in range 0...65535
 
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -104,17 +109,26 @@ void power_off(){
   remember_score();
 
   display.clearDisplay();
-  display.setTextSize(2);
-  display.setCursor(6,6);
-  display.print("Yours:");
-  display.println(mosq_kills);
-  display.setTextSize(1);
-  display.setCursor(6,23);
-  display.print("Highest: ");
-  display.println(high_score);
+  if(mosq_kills==high_score){
+    if(prefs_audio) myDFPlayer.playFolder(6,50);
+    display.setTextSize(2);
+    display.setCursor(4,1);
+    display.print("Highscore!");
+    display.setCursor(16,18);
+    display.print(high_score);
+    display.print(" kills");
+  }else{
+    if(prefs_audio) myDFPlayer.playFolder(2,random(mp3_2));
+    display.setTextSize(2);
+    display.setCursor(6,6);
+    display.print("Yours:");
+    display.println(mosq_kills);
+    display.setTextSize(1);
+    display.setCursor(6,23);
+    display.print("Highest: ");
+    display.println(high_score);
+  }
   display.display();
-  
-  if(prefs_audio) myDFPlayer.playFolder(2,random(mp3_2));
 }
 
 void power_on(){
@@ -126,25 +140,6 @@ void power_on(){
   display.setCursor(9,7);
   display.println("Fight!");
   display.display();
-}
-
-void display_kills(){
-  display.clearDisplay();
-  display.setTextSize(2);
-  display.setTextColor(WHITE); 
-  display.drawRect(1, 1, 127, 31, WHITE);
-  display.setCursor(6,7);
-  display.print("Kills: ");
-  display.println(mosq_kills);
-  display.display();
-//  Serial.print("audio:");
-//  Serial.println(next_kill_audio);
-  if(next_kill_audio<mosq_kills){
-    if(prefs_audio) myDFPlayer.playFolder(3,random(mp3_3));
-    next_kill_audio+=random(1,kill_sound_cnt);
-  }
-//  Serial.print(" naudio:");
-//  Serial.println(next_kill_audio);
 }
 
 
@@ -189,6 +184,26 @@ bool cur_menu_butt1_state;
 }
 
 
+void display_kills(){
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setTextColor(WHITE); 
+  display.drawRect(1, 1, 127, 31, WHITE);
+  display.setCursor(6,7);
+  display.print("Kills: ");
+  display.println(mosq_kills);
+  display.display();
+//  Serial.print("audio:");
+//  Serial.println(next_kill_audio);
+  if(next_kill_audio<mosq_kills){
+    if(prefs_audio) myDFPlayer.playFolder(3,random(mp3_3));
+    next_kill_audio+=random(4,kill_sound_cnt);
+  }
+//  Serial.print(" naudio:");
+//  Serial.println(next_kill_audio);
+}
+
+
 // Process mosquito kill
 void kill_mosquito(){
 uint32_t new_kill=millis();
@@ -196,6 +211,9 @@ uint32_t new_kill=millis();
   mosq_kills++;
   if(last_kill+kill_combo_threshold>new_kill){  // check if we have a combo?
     kombo_kill_count++;
+    next_kill_audio++;  // to not double combo sound with standard sound
+    Serial.print("Kombo kill: "); Serial.println(kombo_kill_count);
+    if(prefs_audio) myDFPlayer.playFolder(4,kombo_kill_count);
   }else{
     kombo_kill_count=0;
   }
@@ -253,6 +271,16 @@ bool cur_zap_butt_state;
   return old_zap_butt_state;
 }
 
+// Check timeout for sentence and play it
+void check_sentence(){
+  if(millis()<next_sentence) return;
+  next_sentence=millis()+random(min_delay_for_sentence,max_delay_for_sentence);
+  if(prefs_audio) myDFPlayer.playFolder(5,random(mp3_5));
+  Serial.println("Audi sentence played!");
+  Serial.print(" Now is: "); Serial.println(millis());
+  Serial.print(" Next sentence millis: "); Serial.println(next_sentence);
+  Serial.print(" Next sentence seconds: "); Serial.println((next_sentence-millis())/60000,0);
+}
 
 /*
 ** Initialize all stuff - arduino style
@@ -290,24 +318,28 @@ void setup(void){
   }
   Serial.println(F("DFPlayer Mini online."));
   restore_score();
-  myDFPlayer.volume(15);  //Set volume value. From 0 to 30
-  if(prefs_audio) myDFPlayer.playFolder(5,1);
+  myDFPlayer.volume(20);  //Set volume value. From 0 to 30
+ // if(prefs_audio) myDFPlayer.playFolder(6,1);
 
-  
-  Serial.println("Getting differential reading from AIN0 (P) and AIN1 (N)");
-  Serial.println("ADC Range: +/- 6.144V (1 bit = 3mV/ADS1015, 0.1875mV/ADS1115)");
   pinMode(zapButtonPin, INPUT_PULLUP);
+    
+  Serial.println("Getting differential reading from AIN0 (P) and AIN1 (N)");
+  Serial.println("ADC Range: 1x gain   +/- 4.096V  1 bit = 2mV      0.125mV");
+  ads.setGain(GAIN_ONE);
   ads.begin();
-  
+
+  next_sentence=millis()+random(min_delay_for_sentence,max_delay_for_sentence);  // set the next play sentence
 }
 
 
+byte count=0;
 
 void loop(void){
 int16_t results;
 
   check_menu();
-  
+  check_sentence();
+
   if(!check_zap_button()) return; // if the zap button is not pressed - we no need to go further
 
   /* Be sure to update this value based on the IC and the gain settings! */
@@ -315,8 +347,11 @@ int16_t results;
   //float multiplier = 0.1875F; /* ADS1115  @ +/- 6.144V gain (16-bit results) */
 
   results = ads.readADC_Differential_0_1();
-  //Serial.print("Differential: "); Serial.print(results); Serial.print("("); Serial.print(results * multiplier); Serial.println("mV)"); delay(100);
-  
+/*  if(count>20){
+    Serial.print("Differential: "); Serial.print(results); Serial.print("("); Serial.print(results * multiplier); Serial.println("mV)"); delay(100);
+    count=0;
+  }else count++;
+*/  
   if(results>max_val){
     max_val=results;
     //Serial.print(".. setting new max"); Serial.println(max_val);
@@ -324,7 +359,7 @@ int16_t results;
     if(max_val>total_max_val) total_max_val=max_val;
   }
 
-  if(results<(max_val*0.6) && max_val>100){ // we have discharge
+  if(results<(max_val*0.5) && max_val>100){ // we have discharge
     Serial.println("Discharge!");
     if((last_kill+kill_grace_period)<millis()){  // if we pass grace perdiod (not a chain discharge)
       Serial.print("Kill! maxV:"); Serial.print(max_val); Serial.print(" res:"); Serial.print(results); Serial.print("("); Serial.print(results * multiplier); Serial.println("mV)");
