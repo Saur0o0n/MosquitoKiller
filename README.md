@@ -10,6 +10,7 @@ It ads kill counter, high score and sound effects.
 * OLED display 128x32 (called OLED-091)
 * ADS1015 board
 * DFPlayer Mini with SD card and speaker (I've used old laptop speakers)
+* NPN transistor (I've used 2SC828A - but only because I've pick this one from the box)
 * some 10k resistors, one ~32k resistor, switch and wires
 
 ## Assembly

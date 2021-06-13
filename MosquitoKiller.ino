@@ -1,6 +1,6 @@
 /*
-** Mosquit Killer app for Aruino and handheld electric bug killers
-** Last update: 2021.06.07
+** Mosquit Killer v0.5 app for Aruino and handheld electric bug killers
+** Last update: 2021.06.14
 ** by Adrian (Sauron) Siemieniak
 */
 #include <Adafruit_ADS1X15.h>
@@ -27,7 +27,7 @@ Adafruit_ADS1015 ads;     /* Use this for the 12-bit version */
 bool old_zap_butt_state = 0;
 uint8_t zap_butt_hist = 0, zap_butt_cnt = 0;
 
-const uint16_t menu_button_short = 900; // how long (ms) is short press, everything above is long press
+const uint16_t menu_button_short = 800; // how long (ms) is short press, everything above is long press
 uint32_t menu_button_time = 0;  // when was last time menu button was pressed (to count long/short presses)
 
 uint16_t mosq_kills = 0;
@@ -42,8 +42,8 @@ uint32_t last_kill = millis();
  * Preferences (kind off ;) )
 */
 bool prefs_audio = 1; // audio on/off
-uint8_t eeprom_cell = 10;
-const uint16_t eeprom_code = "12345";   // this is awqard way to find out if this is the first run at all
+int eeprom_cell = 10;
+const uint16_t eeprom_code = 22345;   // this is awkward way to find out if this is the first run at all, put here unique value in range 0...65535
 
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -66,7 +66,8 @@ void remember_score(){
 
   if(mosq_kills > high_score){
     high_score=mosq_kills;
-    EEPROM.put(eeprom_cell, high_score);
+    EEPROM.put(eeprom_cell+10, high_score);
+    EEPROM.put(eeprom_cell+12, prefs_audio);
   }
 }
 
@@ -75,12 +76,23 @@ void restore_score(){
 uint16_t ee_tmp=0;
 
   if(!high_score){
-    EEPROM.get(eeprom_cell+10,ee_tmp);
+    EEPROM.get(eeprom_cell,ee_tmp);
     if(ee_tmp==eeprom_code){  // it's not the first run - restore high score
-      EEPROM.get(eeprom_cell, high_score);
+      Serial.println("Restoring eeprom");
+      Serial.print(" eeprom code was: ");Serial.println(ee_tmp);
+      EEPROM.get(eeprom_cell+10, high_score);
+      Serial.print(" High score value: "); Serial.println(high_score);
+      EEPROM.get(eeprom_cell+12, prefs_audio);
     }else{      // it's the first run - initialize code and remember zero as high score
-      EEPROM.put(eeprom_cell+10,eeprom_code);
-      remember_score();
+      Serial.println("Initializing eeprom - first run");
+      Serial.print(" eeprom code was:"); Serial.println(ee_tmp);
+      EEPROM.put(eeprom_cell,eeprom_code);
+      
+      high_score=mosq_kills=0;
+      EEPROM.put(eeprom_cell+10, high_score);
+      EEPROM.put(eeprom_cell+12, prefs_audio);
+    
+      //remember_score();
     }
   }
 }
@@ -128,7 +140,7 @@ void display_kills(){
 //  Serial.print("audio:");
 //  Serial.println(next_kill_audio);
   if(next_kill_audio<mosq_kills){
-    myDFPlayer.playFolder(3,random(mp3_3));
+    if(prefs_audio) myDFPlayer.playFolder(3,random(mp3_3));
     next_kill_audio+=random(1,kill_sound_cnt);
   }
 //  Serial.print(" naudio:");
@@ -151,6 +163,7 @@ void menu_long_press(){
   if(prefs_audio) display.println("Audio on");
   else display.println("Audio off");
   display.display();
+  EEPROM.put(eeprom_cell+12, prefs_audio);
 }
 
 // Process menu button(s)
@@ -195,7 +208,7 @@ uint32_t new_kill=millis();
 bool check_zap_button(){
 bool cur_zap_butt_state;
 
-  cur_zap_butt_state = digitalRead(zapButtonPin);
+  cur_zap_butt_state = !digitalRead(zapButtonPin);  // invert, because we have changed to PULLUP with transistor
   
   //Serial.println(cur_zap_butt_state);
   //delay(100);
@@ -276,13 +289,14 @@ void setup(void){
 //    }
   }
   Serial.println(F("DFPlayer Mini online."));
-  myDFPlayer.volume(15);  //Set volume value. From 0 to 30
-//  if(prefs_audio) myDFPlayer.playFolder(5,1);
   restore_score();
+  myDFPlayer.volume(15);  //Set volume value. From 0 to 30
+  if(prefs_audio) myDFPlayer.playFolder(5,1);
+
   
   Serial.println("Getting differential reading from AIN0 (P) and AIN1 (N)");
   Serial.println("ADC Range: +/- 6.144V (1 bit = 3mV/ADS1015, 0.1875mV/ADS1115)");
-  pinMode(zapButtonPin, INPUT);
+  pinMode(zapButtonPin, INPUT_PULLUP);
   ads.begin();
   
 }
@@ -300,7 +314,9 @@ int16_t results;
   float   multiplier = 3.0F;    /* ADS1015 @ +/- 6.144V gain (12-bit results) */
   //float multiplier = 0.1875F; /* ADS1115  @ +/- 6.144V gain (16-bit results) */
 
-  results = ads.readADC_Differential_0_1();  
+  results = ads.readADC_Differential_0_1();
+  //Serial.print("Differential: "); Serial.print(results); Serial.print("("); Serial.print(results * multiplier); Serial.println("mV)"); delay(100);
+  
   if(results>max_val){
     max_val=results;
     //Serial.print(".. setting new max"); Serial.println(max_val);
@@ -308,7 +324,8 @@ int16_t results;
     if(max_val>total_max_val) total_max_val=max_val;
   }
 
-  if(results<(max_val*0.8) && max_val>100){ // we have discharge
+  if(results<(max_val*0.6) && max_val>100){ // we have discharge
+    Serial.println("Discharge!");
     if((last_kill+kill_grace_period)<millis()){  // if we pass grace perdiod (not a chain discharge)
       Serial.print("Kill! maxV:"); Serial.print(max_val); Serial.print(" res:"); Serial.print(results); Serial.print("("); Serial.print(results * multiplier); Serial.println("mV)");
       kill_mosquito();
