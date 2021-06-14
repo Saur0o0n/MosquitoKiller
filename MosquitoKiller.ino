@@ -1,5 +1,5 @@
 /*
-** Mosquit Killer v0.5 app for Aruino and handheld electric bug killers
+** Mosquit Killer v1.0 app for Aruino and handheld electric bug killers
 ** Last update: 2021.06.14
 ** by Adrian (Sauron) Siemieniak
 */
@@ -15,11 +15,11 @@ const byte menuButtonPin1 = 8; // menu button pin
 
 DFRobotDFPlayerMini myDFPlayer;
 void printDetail(uint8_t type, int value);
-const uint8_t mp3_1 = 15; // (+1) start
+const uint8_t mp3_1 = 17; // (+1) start
 const uint8_t mp3_2 = 13; // (+1) stop
 const uint8_t mp3_3 = 5;  // (+1) victory
 const uint8_t mp3_4 = 6;  // (+1) combo sound
-const uint8_t mp3_5 = 8;  // (+1) go on and move your ass sounds (when there is no killing)
+const uint8_t mp3_5 = 10;  // (+1) go on and move your ass sounds (when there is no killing)
 
 const byte kill_sound_cnt = 15;  // how often should hear kill sound (random(kill_sound_cnt))
 // Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
@@ -48,7 +48,7 @@ const uint32_t max_delay_for_sentence = 1200000; // And maximum delay - like 20m
 */
 bool prefs_audio = 1; // audio on/off
 int eeprom_cell = 10;
-const uint16_t eeprom_code = 12345;   // this is awkward way to find out if this is the first run at all, put here unique value in range 0...65535
+const uint16_t eeprom_code = 22345;   // this is awkward way to find out if this is the first run at all, put here unique value in range 0...65535
 
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -103,14 +103,19 @@ uint16_t ee_tmp=0;
 }
 
 void power_off(){
+static bool first=1;
+
   Serial.println("Power OFF :(");
   max_val=10;
 
   remember_score();
 
   display.clearDisplay();
-  if(mosq_kills==high_score){
-    if(prefs_audio) myDFPlayer.playFolder(6,50);
+  if(mosq_kills==high_score && high_score>0){
+    if(first){  // play highscore audio only once for a session
+      if(prefs_audio) myDFPlayer.playFolder(6,50);
+      first=0;
+    }
     display.setTextSize(2);
     display.setCursor(4,1);
     display.print("Highscore!");
@@ -279,7 +284,7 @@ void check_sentence(){
   Serial.println("Audi sentence played!");
   Serial.print(" Now is: "); Serial.println(millis());
   Serial.print(" Next sentence millis: "); Serial.println(next_sentence);
-  Serial.print(" Next sentence seconds: "); Serial.println((next_sentence-millis())/60000,0);
+  Serial.print(" Next sentence seconds: "); Serial.println((int)((next_sentence-millis())/1000));
 }
 
 /*
@@ -318,8 +323,8 @@ void setup(void){
   }
   Serial.println(F("DFPlayer Mini online."));
   restore_score();
-  myDFPlayer.volume(20);  //Set volume value. From 0 to 30
- // if(prefs_audio) myDFPlayer.playFolder(6,1);
+  myDFPlayer.volume(25);  //Set volume value. From 0 to 30
+  if(prefs_audio) myDFPlayer.playFolder(6,1);
 
   pinMode(zapButtonPin, INPUT_PULLUP);
     
@@ -332,9 +337,8 @@ void setup(void){
 }
 
 
-byte count=0;
-
 void loop(void){
+static byte count=0;
 int16_t results;
 
   check_menu();
