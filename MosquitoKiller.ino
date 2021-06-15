@@ -1,6 +1,6 @@
 /*
 ** Mosquit Killer v1.0 app for Aruino and handheld electric bug killers
-** Last update: 2021.06.14
+** Last update: 2021.06.15
 ** by Adrian (Sauron) Siemieniak
 */
 #include <Adafruit_ADS1X15.h>
@@ -25,8 +25,10 @@ const byte kill_sound_cnt = 15;  // how often should hear kill sound (random(kil
 // Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
 Adafruit_ADS1015 ads;     /* Use this for the 12-bit version */
 
-bool old_zap_butt_state = 0;
-uint8_t zap_butt_hist = 0, zap_butt_cnt = 0;
+const uint16_t zap_button_grace_period = 600;  // if you release and press zap button in less then 0,6s (600ms), it still be counted as the same player and no sound will be played.
+                                                // this is because often new people don't hold this button to firm and release it slightly (unless it's what I've observed)
+uint32_t zap_button_delayed_off = 0;
+
 
 const uint16_t menu_button_short = 800; // how long (ms) is short press, everything above is long press
 uint32_t menu_button_time = 0;  // when was last time menu button was pressed (to count long/short presses)
@@ -34,21 +36,22 @@ uint32_t menu_button_time = 0;  // when was last time menu button was pressed (t
 uint16_t mosq_kills = 0;
 uint16_t high_score = 0;
 uint8_t next_kill_audio = 0;
-const uint16_t kill_grace_period = 700;  // Kill will be counted every 0,7s
+const uint16_t kill_grace_period = 700;  // Kill will be counted only every 0,7+s
 const uint16_t kill_combo_threshold = 1500;  // window where next kill is counted for combo
 uint8_t kombo_kill_count = 0; // how much killed in a row
 uint32_t last_kill = millis();
 
-uint32_t next_sentence = 0;  // if "player" is doing nothing, play something not too often
+uint32_t next_sentence = 0;  // if "player" is doing nothing, play something, but not too often
 
 const uint32_t min_delay_for_sentence = 60000;  // Some minimal delay, like 60s
 const uint32_t max_delay_for_sentence = 1200000; // And maximum delay - like 20min
+
 /*
  * Preferences (kind off ;) )
 */
 bool prefs_audio = 1; // audio on/off
-int eeprom_cell = 10;
-const uint16_t eeprom_code = 22345;   // this is awkward way to find out if this is the first run at all, put here unique value in range 0...65535
+int eeprom_cell = 30;
+const uint16_t eeprom_code = 12345;   // this is awkward way to find out if this is the first run at all, put here unique value in range 0...65535
 
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -107,6 +110,7 @@ static bool first=1;
 
   Serial.println("Power OFF :(");
   max_val=10;
+  zap_button_delayed_off=0;
 
   remember_score();
 
@@ -134,11 +138,14 @@ static bool first=1;
     display.println(high_score);
   }
   display.display();
+  mosq_kills=0;   // reset counter
 }
+
 
 void power_on(){
   Serial.println("Power ON!");
-  if(prefs_audio) myDFPlayer.playFolder(1,random(mp3_1));
+
+  if(!zap_button_delayed_off && prefs_audio) myDFPlayer.playFolder(1,random(mp3_1));
   
   display.clearDisplay();
   display.setTextSize(3);
@@ -150,7 +157,21 @@ void power_on(){
 
 // Menu short press
 void menu_short_press(){
+static uint8_t volume=25;
+
   Serial.println("Short press");
+  display.clearDisplay();
+  display.setTextSize(2);
+  display.setCursor(1,10);
+  if(volume>29) volume=1;
+  else volume++;
+  
+  myDFPlayer.volume(volume);
+  
+  display.print("Vol: ");
+  display.print(volume);
+  display.println("/30");
+  display.display();
 }
 
 // Process long press
@@ -168,23 +189,27 @@ void menu_long_press(){
 
 // Process menu button(s)
 void check_menu(){
+static bool long_press=0;
 bool cur_menu_butt1_state;
 
   cur_menu_butt1_state = digitalRead(menuButtonPin1);
   //Serial.println(cur_menu_butt1_state); delay(100);
   if(cur_menu_butt1_state){   // button not pressed or released
     if(menu_button_time!=0){  // button released
-      if(menu_button_time+menu_button_short>millis()){  // short press
+      if(!long_press){  // short press
         menu_short_press();
-      }else{  // long press
-        menu_long_press();
-      }
+      }else long_press=0;
       delay(100); // poors man debounce ;)
       menu_button_time=0;
     }
     return;
   }else{  // button pressed
-    if(menu_button_time==0) menu_button_time=millis();
+    if(menu_button_time==0 && !long_press) menu_button_time=millis();
+    else if(menu_button_time+menu_button_short<millis() && !long_press){ // long press
+      menu_long_press();
+      delay(100); // poors man debounce ;)
+      long_press=1;  // so we will have not next long press, until button release
+    }
   }
 }
 
@@ -229,6 +254,8 @@ uint32_t new_kill=millis();
 
 // Check if the power button is pressed and debounce it
 bool check_zap_button(){
+static bool old_zap_butt_state = 0;
+static uint8_t zap_butt_hist = 0, zap_butt_cnt = 0;
 bool cur_zap_butt_state;
 
   cur_zap_butt_state = !digitalRead(zapButtonPin);  // invert, because we have changed to PULLUP with transistor
@@ -266,10 +293,13 @@ bool cur_zap_butt_state;
     }
   }
 
+  
   if(cur_zap_butt_state>old_zap_butt_state){
     power_on();
+    zap_button_delayed_off=0; // zero potential delayed off
   }else if(cur_zap_butt_state<old_zap_butt_state){
-    power_off();
+    // power_off(); // now we wait zap_button_grace_period - perhaps player will change his mind
+    zap_button_delayed_off=millis()+zap_button_grace_period; // remember last change
   }
   old_zap_butt_state=cur_zap_butt_state;
   
@@ -341,6 +371,9 @@ void loop(void){
 static byte count=0;
 int16_t results;
 
+  if(zap_button_delayed_off && zap_button_delayed_off<millis()){    // delayed off
+    power_off();
+  }
   check_menu();
   check_sentence();
 
