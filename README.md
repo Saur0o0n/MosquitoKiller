@@ -6,17 +6,29 @@ It's a modification of existing hand mosquito zapping devices so it will make mo
 
 It ads kill counter, high score and sound effects.
 
-## Components
+# How does it work?
+
+* MosquitoKiller is powered from zap racket battery, and it's turn on with racket - starts with welcome sound
+* when you press racket zap button (to charge high voltage) - you will hear encourage sound to fight :), score is counted from 0 (new player)
+* it counts every discharge as kill, unless it happens faster then 0,7 second in a row (usually it's the same mosquito then ;) )
+* if kills are less, then 1,5 second apart - it counts it in for combo, and start to play combo sound (every level - different sound - up to 6)
+* during killing ehm... playing ;) - from time to time, you will have random kill sound
+* when you release zap button, you will see your score vs highscore, if you haven't made a highscore you will have negative sound
+* if you hit high score, it will be saved
+* short button press cycles through sound volume, long press turns sound on/off
+* when you leave MosquitoKiller on, but not used - you will hear some encouraging quotes sporadically
+
+# Components
 
 * Arduino nano (any Arduino will work, this one I had at hand and it's small)
 * OLED display 128x32 (called OLED-091)
 * ADS1015 board
 * DFPlayer Mini with SD card and speaker (I've used old laptop speakers - they are quite powerful for their size)
-* Step-Up/Boos DC-DC converter board (to have stabilized 5V output), 1A output is enough (I've used MT3608)
+* Step-Up/Boost DC-DC converter board (to have stabilized 5V output), 1A output is enough (I've used MT3608)
 * NPN transistor (I've used 2SC828A - but only because I've pick this one from the box)
 * some 10k resistors, one ~32k resistor, switch and wires
 
-## Assembly
+# Assembly
 
 ![MosquitoKiller schematic](https://raw.githubusercontent.com/Saur0o0n/MosquitoKiller/main/documentation/MosquitoKiller-schematic.png)
 
@@ -24,7 +36,7 @@ It ads kill counter, high score and sound effects.
 
 2. Format your micro SD card and copy content of 'sdcard' folder - on it. Check if the button, OLED display and audio are working (there will be welcome sound on start).
 
-3. Dismantle the mosquito racket and lead the wires like on the picture. Solder (black) BAT- directly from battery. The positive (BAT+ - red wire) should be connected to place, that is powered only when sliding button is on upper or lower position. So the MosquitKiller addon will be powered only when racket is enabled. You can find solder places close to the sliding switch or as in my case, on one side of the zap button (check with multimeter connecting GND/BAT- and one side of the zap button - if there is voltage, without pressing button - this is the place).
+3. Dismantle the mosquito racket and lead the wires like on the picture. Solder (black) BAT- directly from battery. The positive (BAT+ - red wire) should be connected to place, that is powered only when sliding button is on upper or lower position. So the MosquitoKiller addon will be powered only when racket is enabled. You can find solder places close to the sliding switch or as in my case, on one side of the zap button (check with multimeter connecting GND/BAT- and one side of the zap button - if there is voltage, without pressing button - this is the place).
 
 4. Connect "zap button" wire (blue) to the side of the button, that is powered only when pressed (and when the high voltage capacitor is charging).
 ![Mosquito Racket - wires](https://raw.githubusercontent.com/Saur0o0n/MosquitoKiller/main/documentation/MosquitZap-wires1.jpg)
@@ -47,4 +59,8 @@ Anyway, don't bend resistors to the PCB - let them stay like on the picture, so 
 9. Have a fun!
 
 10. I've also add additional LED on top of the racket, so I could easier see when it's activated (sometimes, when pressed not exactly in the middle of the button, it tends not to work) - so I've lead double wire from the green LED to the top of the device.
+
+## Side notes
+
+
 
