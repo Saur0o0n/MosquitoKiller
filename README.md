@@ -12,6 +12,7 @@ It ads kill counter, high score and sound effects.
 * OLED display 128x32 (called OLED-091)
 * ADS1015 board
 * DFPlayer Mini with SD card and speaker (I've used old laptop speakers - they are quite powerful for their size)
+* Step-Up/Boos DC-DC converter board (to have stabilized 5V output), 1A output is enough (I've used MT3608)
 * NPN transistor (I've used 2SC828A - but only because I've pick this one from the box)
 * some 10k resistors, one ~32k resistor, switch and wires
 
@@ -20,19 +21,30 @@ It ads kill counter, high score and sound effects.
 ![MosquitoKiller schematic](https://raw.githubusercontent.com/Saur0o0n/MosquitoKiller/main/documentation/MosquitoKiller-schematic.png)
 
 1. You should assemble everything as on diagram above.
-2. Dismantle the mosquito racket and lead the wires like on the picture. Pair (black and red) directly from battery (button in my case is connected directly to battery - it was easier to solder). One wire from the button - that will inform our controller that it's pressed (blue) and two wires from voltage divider (yellow and green).
+
+2. Format your micro SD card and copy content of 'sdcard' folder - on it. Check if the button, OLED display and audio are working (there will be welcome sound on start).
+
+3. Dismantle the mosquito racket and lead the wires like on the picture. Solder (black) BAT- directly from battery. The positive (BAT+ - red wire) should be connected to place, that is powered only when sliding button is on upper or lower position. So the MosquitKiller addon will be powered only when racket is enabled. You can find solder places close to the sliding switch or as in my case, on one side of the zap button (check with multimeter connecting GND/BAT- and one side of the zap button - if there is voltage, without pressing button - this is the place).
+
+4. Connect "zap button" wire (blue) to the side of the button, that is powered only when pressed (and when the high voltage capacitor is charging).
 ![Mosquito Racket - wires](https://raw.githubusercontent.com/Saur0o0n/MosquitoKiller/main/documentation/MosquitZap-wires1.jpg)
-3. I've also add additional LED on top of the racket, so I could easier see when it's activated (sometimes, when pressed not in the middle of the button, it tends not to work) - so I've lead double wire from the green LED to the top of the device.
-4. Voltage divider - we can measure up to 5,2V with ADS1015 and Arduino Nano (5v+threshold). The mosquito zapper uses somewhere around 2000V - so no luck with direct measurement (I don't even have multimeter that will allow this voltage levels).
+
+5. Unsolder one side of one bleed resistor - choose one, where it will be easy to add additional resistor, without closing to other components. Add resistor and solder wires to it (green and yellow) - explanation below.
+
+6. Voltage divider - we can measure up to 5,3V with ADS1015 and Arduino Nano (5v+threshold). The mosquito zapper uses somewhere around 2000V - so no luck with direct measurement (I don't even have multimeter that will allow this voltage levels).
 Easiest solution (for me) was to use voltage divider. Definitely not the best, since we have potentially high voltage (spark etc) close to micro controller. But I failed to find something better. Perhaps some capacitor coupling (as I've found suggestion on Internet) - but I've failed to implement it.
 Anyway since the high voltage part is also "behind" the transformer it does not have common ground - so I've used ADS1015 in differential mode (not comparing to ground) (some other Atmega controllers also have this features - AT328 - doesn't have).
 ![Mosquito Racket - voltage divider](https://raw.githubusercontent.com/Saur0o0n/MosquitoKiller/main/documentation/MosquitZap-divider1.jpg)
-Since my racket had 3 bleeding resistor in series (they are used to discharge capacitor - if you don't use it) - all 22MOhm (which gives 66MOhm in total). So to have voltage <3V (I wanted to be ready for other controllers - and there is no need for precision) it should be ok to introduce additional resistor with value 100kOhm. But this produced voltage close to 5V - check with multimeter first!!
+Since my racket had 3 bleeding resistor in series (they are used to discharge capacitor - if you don't use it) - all, according to color coding, 22MOhm (which gives 66MOhm in total). So to have voltage <3V (I wanted to be ready for other controllers - and there is no need for precision) it should be ok to introduce additional resistor with value 100kOhm. But this produced voltage close to 5V - so check with multimeter first!!
 So I've settled with 32kOhm and I'm having max voltage close to 3V. I'm not sure if the voltage on capacitor is higher or the resistors where out of spec (my multimeter reads more like 18MOhms - but it did it hardly - so I don't believe it either). So please check it how it works for you, before connecting it to Arduino.
-Currently, on ADS1015, voltage threshold is setup to 3V max (it can go up to 5,3V - if you change in program code).
+Currently in the code, on ADS1015, voltage threshold is setup to 3V max (it can go up to 5,3V - if you change it).
 Anyway, don't bend resistors to the PCB - let them stay like on the picture, so there couldn't be any uncontrolled discharge.
-5. Format your micro SD card and copy content of 'sdcard' folder - on to your sdcard.
-6. Upload sketch to Arduino Nano
-7. Have a fun!
 
+7. Connect step-up board to black/red wires, switch on the racket and with multimeter measure output - set it up to 5V exactly. I recommend to add some biffy capacitor on output (470uF or more), and perhaps on input also (I don't have it - but there where times, when hitting extra combo - board hanged. First sign of power starve is distorted sound)
+
+8. Connect step-up board output to Arduino GND and 5V pin (not VIN), to ADS1015 and to DFPlayer (preferably add separate capacitor for DFPlayer only)
+
+9. Have a fun!
+
+10. I've also add additional LED on top of the racket, so I could easier see when it's activated (sometimes, when pressed not exactly in the middle of the button, it tends not to work) - so I've lead double wire from the green LED to the top of the device.
 
