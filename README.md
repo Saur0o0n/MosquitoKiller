@@ -2,6 +2,8 @@
 
 It's a modification of existing hand mosquito zapping devices so it will make more fun to do it - if it's not enough already :)
 
+![Mosquito Racket + Arduino Nano = MosquitoKiller](https://raw.githubusercontent.com/Saur0o0n/MosquitoKiller/main/documentation/MosquitKiller-photo1.jpeg)
+
 It ads kill counter, high score and sound effects.
 
 ## Components
@@ -26,9 +28,11 @@ Easiest solution (for me) was to use voltage divider. Definitely not the best, s
 Anyway since the high voltage part is also "behind" the transformer it does not have common ground - so I've used ADS1015 in differential mode (not comparing to ground) (some other Atmega controllers also have this features - AT328 - doesn't have).
 ![Mosquito Racket - voltage divider](https://raw.githubusercontent.com/Saur0o0n/MosquitoKiller/main/documentation/MosquitZap-divider1.jpg)
 Since my racket had 3 bleeding resistor in series (they are used to discharge capacitor - if you don't use it) - all 22MOhm (which gives 66MOhm in total). So to have voltage <3V (I wanted to be ready for other controllers - and there is no need for precision) it should be ok to introduce additional resistor with value 100kOhm. But this produced voltage close to 5V - check with multimeter first!!
-So I've settled with 32kOhm and I'm having max voltage close to 3V. I'm not sure if the voltage on capacitor is higher or the resistors where out of spec (my multimeter reads more like 18MOhms - but it did it hardly - so I don't believe it either). So please check it how it works for you, before connecting it to Arduino. Currently voltage threshold is setup to 3V max (it can go up to 5,4V - if you change in program code).
+So I've settled with 32kOhm and I'm having max voltage close to 3V. I'm not sure if the voltage on capacitor is higher or the resistors where out of spec (my multimeter reads more like 18MOhms - but it did it hardly - so I don't believe it either). So please check it how it works for you, before connecting it to Arduino.
+Currently, on ADS1015, voltage threshold is setup to 3V max (it can go up to 5,3V - if you change in program code).
 Anyway, don't bend resistors to the PCB - let them stay like on the picture, so there couldn't be any uncontrolled discharge.
 5. Format your micro SD card and copy content of 'sdcard' folder - on to your sdcard.
-6. Have a fun!
+6. Upload sketch to Arduino Nano
+7. Have a fun!
 
 

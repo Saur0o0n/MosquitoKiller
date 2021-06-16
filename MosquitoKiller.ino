@@ -17,11 +17,12 @@ DFRobotDFPlayerMini myDFPlayer;
 void printDetail(uint8_t type, int value);
 const uint8_t mp3_1 = 17; // (+1) start
 const uint8_t mp3_2 = 13; // (+1) stop
-const uint8_t mp3_3 = 5;  // (+1) victory
-const uint8_t mp3_4 = 6;  // (+1) combo sound
-const uint8_t mp3_5 = 10;  // (+1) go on and move your ass sounds (when there is no killing)
+const uint8_t mp3_3 = 7;  // (+1) victory
+const uint8_t mp3_4 = 7;  // (+1) combo sound
+const uint8_t mp3_5 = 10; // (+1) go on and move your ass sounds (when there is no killing)
 
-const byte kill_sound_cnt = 15;  // how often should hear kill sound (random(kill_sound_cnt))
+uint8_t volume=25;        // volume level
+const byte kill_sound_cnt = 13;  // how often should hear kill sound (random(kill_sound_cnt))
 // Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
 Adafruit_ADS1015 ads;     /* Use this for the 12-bit version */
 
@@ -51,7 +52,7 @@ const uint32_t max_delay_for_sentence = 1200000; // And maximum delay - like 20m
 */
 bool prefs_audio = 1; // audio on/off
 int eeprom_cell = 30;
-const uint16_t eeprom_code = 12345;   // this is awkward way to find out if this is the first run at all, put here unique value in range 0...65535
+const uint16_t eeprom_code = 22345;   // this is awkward way to find out if this is the first run at all, put here unique value in range 0...65535
 
 
 #define SCREEN_WIDTH 128 // OLED display width, in pixels
@@ -76,6 +77,7 @@ void remember_score(){
     high_score=mosq_kills;
     EEPROM.put(eeprom_cell+10, high_score);
     EEPROM.put(eeprom_cell+12, prefs_audio);
+    EEPROM.put(eeprom_cell+14, volume);
   }
 }
 
@@ -91,6 +93,7 @@ uint16_t ee_tmp=0;
       EEPROM.get(eeprom_cell+10, high_score);
       Serial.print(" High score value: "); Serial.println(high_score);
       EEPROM.get(eeprom_cell+12, prefs_audio);
+      EEPROM.get(eeprom_cell+14, volume);
     }else{      // it's the first run - initialize code and remember zero as high score
       Serial.println("Initializing eeprom - first run");
       Serial.print(" eeprom code was:"); Serial.println(ee_tmp);
@@ -99,7 +102,7 @@ uint16_t ee_tmp=0;
       high_score=mosq_kills=0;
       EEPROM.put(eeprom_cell+10, high_score);
       EEPROM.put(eeprom_cell+12, prefs_audio);
-    
+      EEPROM.put(eeprom_cell+14, volume);
       //remember_score();
     }
   }
@@ -157,7 +160,6 @@ void power_on(){
 
 // Menu short press
 void menu_short_press(){
-static uint8_t volume=25;
 
   Serial.println("Short press");
   display.clearDisplay();
@@ -185,6 +187,7 @@ void menu_long_press(){
   else display.println("Audio off");
   display.display();
   EEPROM.put(eeprom_cell+12, prefs_audio);
+  EEPROM.put(eeprom_cell+14, volume);
 }
 
 // Process menu button(s)
@@ -219,7 +222,7 @@ void display_kills(){
   display.setTextSize(2);
   display.setTextColor(WHITE); 
   display.drawRect(1, 1, 127, 31, WHITE);
-  display.setCursor(6,7);
+  display.setCursor(6,8);
   display.print("Kills: ");
   display.println(mosq_kills);
   display.display();
@@ -227,7 +230,7 @@ void display_kills(){
 //  Serial.println(next_kill_audio);
   if(next_kill_audio<mosq_kills){
     if(prefs_audio) myDFPlayer.playFolder(3,random(mp3_3));
-    next_kill_audio+=random(4,kill_sound_cnt);
+    next_kill_audio+=random(3,kill_sound_cnt);
   }
 //  Serial.print(" naudio:");
 //  Serial.println(next_kill_audio);
@@ -243,7 +246,8 @@ uint32_t new_kill=millis();
     kombo_kill_count++;
     next_kill_audio++;  // to not double combo sound with standard sound
     Serial.print("Kombo kill: "); Serial.println(kombo_kill_count);
-    if(prefs_audio) myDFPlayer.playFolder(4,kombo_kill_count);
+    if(kombo_kill_count<mp3_4)
+      if(prefs_audio) myDFPlayer.playFolder(4,kombo_kill_count);
   }else{
     kombo_kill_count=0;
   }
@@ -306,6 +310,7 @@ bool cur_zap_butt_state;
   return old_zap_butt_state;
 }
 
+
 // Check timeout for sentence and play it
 void check_sentence(){
   if(millis()<next_sentence) return;
@@ -316,6 +321,7 @@ void check_sentence(){
   Serial.print(" Next sentence millis: "); Serial.println(next_sentence);
   Serial.print(" Next sentence seconds: "); Serial.println((int)((next_sentence-millis())/1000));
 }
+
 
 /*
 ** Initialize all stuff - arduino style
@@ -353,7 +359,7 @@ void setup(void){
   }
   Serial.println(F("DFPlayer Mini online."));
   restore_score();
-  myDFPlayer.volume(25);  //Set volume value. From 0 to 30
+  myDFPlayer.volume(volume);  //Set volume value. From 0 to 30
   if(prefs_audio) myDFPlayer.playFolder(6,1);
 
   pinMode(zapButtonPin, INPUT_PULLUP);
