@@ -20,13 +20,13 @@ It ads kill counter, high score and sound effects.
 
 # Components
 
-* Arduino nano (any Arduino will work, this one I had at hand and it's small)
+* Arduino Nano (any Arduino will work, this one I had at hand and it's small)
 * OLED display 128x32 (called OLED-091)
 * ADS1015 board
 * DFPlayer Mini with SD card and speaker (I've used old laptop speakers - they are quite powerful for their size)
 * Step-Up/Boost DC-DC converter board (to have stabilized 5V output), 1A output is enough (I've used MT3608)
 * NPN transistor (I've used 2SC828A - but only because I've pick this one from the box)
-* some 10k resistors, one ~32k resistor, switch and wires
+* some 10k and 1,8K resistors, one ~32k resistor, some capacitors (470uF) switch and wires
 
 # Assembly
 
@@ -61,6 +61,12 @@ Anyway, don't bend resistors to the PCB - let them stay like on the picture, so 
 10. I've also add additional LED on top of the racket, so I could easier see when it's activated (sometimes, when pressed not exactly in the middle of the button, it tends not to work) - so I've lead double wire from the green LED to the top of the device.
 
 ## Side notes
+
+There are some "issue" solved in the code:
+* Arduino Nano had a problem with starting up with external power source connected to 5V - it's known problem, that's why there is startup delay 1,2S
+* There is heavy deboucing for ZAP button - because it had some troubles to stay enabled when not properly pressed
+* Also release of ZAP button for 0,6S is not counted as release (some new "players" had problem with not pushing it correctly and restarting the game) - this produced a lot of noise (on/off sounds and counter reset)
+* There is a lot of interference from high voltage transformer, and when I've assembled and tested the device it was ok. But when I've installed it on top of the racket - it was unable to count and reset after discharge. It was enough to cover step-up board (perhaps unnecessary - but I've learn from other projects, it also produces some noises) with tin foil (wrap it with electric tape, few layers of tin foil and tape again), and lay few layers of tin foil below the MosquitoKiller box (so between racket and black box) - now it works like a charm.
 
 
 
