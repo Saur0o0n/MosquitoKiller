@@ -63,10 +63,13 @@ Anyway, don't bend resistors to the PCB - let them stay like on the picture, so 
 ## Side notes
 
 There are some "issue" solved in the code:
-* Arduino Nano had a problem with starting up with external power source connected to 5V - it's known problem, that's why there is startup delay 1,2S
-* There is heavy deboucing for ZAP button - because it had some troubles to stay enabled when not properly pressed
+* Arduino Nano had a problem with starting up with external power source connected to 5V - it's known problem, that's why there is startup delay 1,2s
+* There is heavy debouncing for ZAP button - because it had some troubles to stay enabled when not properly pressed
 * Also release of ZAP button for 0,6S is not counted as release (some new "players" had problem with not pushing it correctly and restarting the game) - this produced a lot of noise (on/off sounds and counter reset)
 * There is a lot of interference from high voltage transformer, and when I've assembled and tested the device it was ok. But when I've installed it on top of the racket - it was unable to count and reset after discharge. It was enough to cover step-up board (perhaps unnecessary - but I've learn from other projects, it also produces some noises) with tin foil (wrap it with electric tape, few layers of tin foil and tape again), and lay few layers of tin foil below the MosquitoKiller box (so between racket and black box) - now it works like a charm.
 
 
+## Case
+
+I've made rather crude case for components. It's definitely far from anything nice, but there is a lot of components to stuff there and I wanted (unless for start) make it easy to print - without assembly and supports. You can download it from Thingiverse: https://www.thingiverse.com/thing:4887340
 
