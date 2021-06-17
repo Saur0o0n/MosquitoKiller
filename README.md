@@ -6,6 +6,8 @@ It's a modification of existing hand mosquito zapping devices so it will make mo
 
 It ads kill counter, high score and sound effects.
 
+![Quick presentation](https://youtu.be/HYjcLB2ITXo)
+
 # How does it work?
 
 * MosquitoKiller is powered from zap racket battery, and it's turn on with racket - starts with welcome sound
