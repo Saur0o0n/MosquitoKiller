@@ -6,7 +6,7 @@ It's a modification of existing hand mosquito zapping devices so it will make mo
 
 It ads kill counter, high score and sound effects.
 
-![Quick presentation](https://youtu.be/HYjcLB2ITXo)
+[![Quick presentation](https://raw.githubusercontent.com/Saur0o0n/MosquitoKiller/main/documentation/mosquitokiller_in_use.jpg)](https://youtu.be/HYjcLB2ITXo)
 
 # How does it work?
 
