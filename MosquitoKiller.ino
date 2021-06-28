@@ -1,6 +1,6 @@
 /*
 ** Mosquit Killer v1.0 app for Aruino and handheld electric bug killers
-** Last update: 2021.06.15
+** Last update: 2021.06.27
 ** by Adrian (Sauron) Siemieniak
 */
 #include <Adafruit_ADS1X15.h>
@@ -12,17 +12,18 @@
 SoftwareSerial mySoftwareSerial(10, 9); // RX, TX
 const byte zapButtonPin = 12;  // ping where we read zap enable button
 const byte menuButtonPin1 = 8; // menu button pin
+bool cur_zap_butt_state;       // zap button on/off state
 
 DFRobotDFPlayerMini myDFPlayer;
 void printDetail(uint8_t type, int value);
-const uint8_t mp3_1 = 17; // (+1) start
-const uint8_t mp3_2 = 13; // (+1) stop
+const uint8_t mp3_1 = 20; // (+1) start
+const uint8_t mp3_2 = 17; // (+1) stop
 const uint8_t mp3_3 = 7;  // (+1) victory
 const uint8_t mp3_4 = 7;  // (+1) combo sound
 const uint8_t mp3_5 = 10; // (+1) go on and move your ass sounds (when there is no killing)
 
 uint8_t volume=25;        // volume level
-const byte kill_sound_cnt = 13;  // how often should hear kill sound (random(kill_sound_cnt))
+const byte kill_sound_cnt = 12;  // how often should hear kill sound (random(kill_sound_cnt))
 // Adafruit_ADS1115 ads;  /* Use this for the 16-bit version */
 Adafruit_ADS1015 ads;     /* Use this for the 12-bit version */
 
@@ -36,6 +37,8 @@ uint32_t menu_button_time = 0;  // when was last time menu button was pressed (t
 
 uint16_t mosq_kills = 0;
 uint16_t high_score = 0;
+uint16_t session_high_score = 0;
+
 uint8_t next_kill_audio = 0;
 const uint16_t kill_grace_period = 700;  // Kill will be counted only every 0,7+s
 const uint16_t kill_combo_threshold = 1500;  // window where next kill is counted for combo
@@ -108,6 +111,7 @@ uint16_t ee_tmp=0;
   }
 }
 
+// Zap button disabled
 void power_off(){
 static bool first=1;
 
@@ -132,19 +136,22 @@ static bool first=1;
   }else{
     if(prefs_audio) myDFPlayer.playFolder(2,random(mp3_2));
     display.setTextSize(2);
-    display.setCursor(6,6);
+    display.setCursor(6,2);
     display.print("Yours:");
     display.println(mosq_kills);
+    display.setCursor(4,23);
     display.setTextSize(1);
-    display.setCursor(6,23);
-    display.print("Highest: ");
-    display.println(high_score);
+    display.print("Turn: ");
+    display.print(session_high_score);
+    display.print(" | Top: ");
+    display.print(high_score);
   }
   display.display();
   mosq_kills=0;   // reset counter
 }
 
 
+// Zap button enabled
 void power_on(){
   Serial.println("Power ON!");
 
@@ -152,7 +159,7 @@ void power_on(){
   
   display.clearDisplay();
   display.setTextSize(3);
-  display.setCursor(9,7);
+  display.setCursor(11,7);
   display.println("Fight!");
   display.display();
 }
@@ -220,11 +227,15 @@ bool cur_menu_butt1_state;
 void display_kills(){
   display.clearDisplay();
   display.setTextSize(2);
-  display.setTextColor(WHITE); 
-  display.drawRect(1, 1, 127, 31, WHITE);
-  display.setCursor(6,8);
+  display.setCursor(1,2);
   display.print("Kills: ");
   display.println(mosq_kills);
+  display.setTextSize(1);
+  display.setCursor(4,23);
+  display.print("Turn: ");
+  display.print(session_high_score);
+  display.print(" | Top: ");
+  display.print(high_score);
   display.display();
 //  Serial.print("audio:");
 //  Serial.println(next_kill_audio);
@@ -251,6 +262,7 @@ uint32_t new_kill=millis();
   }else{
     kombo_kill_count=0;
   }
+  if (mosq_kills>session_high_score) session_high_score=mosq_kills;  // session high score
   display_kills();
   last_kill = new_kill;
 }
@@ -260,7 +272,6 @@ uint32_t new_kill=millis();
 bool check_zap_button(){
 static bool old_zap_butt_state = 0;
 static uint8_t zap_butt_hist = 0, zap_butt_cnt = 0;
-bool cur_zap_butt_state;
 
   cur_zap_butt_state = !digitalRead(zapButtonPin);  // invert, because we have changed to PULLUP with transistor
   
@@ -315,7 +326,7 @@ bool cur_zap_butt_state;
 void check_sentence(){
   if(millis()<next_sentence) return;
   next_sentence=millis()+random(min_delay_for_sentence,max_delay_for_sentence);
-  if(prefs_audio) myDFPlayer.playFolder(5,random(mp3_5));
+  if(prefs_audio && !cur_zap_butt_state) myDFPlayer.playFolder(5,random(mp3_5));
   Serial.println("Audi sentence played!");
   Serial.print(" Now is: "); Serial.println(millis());
   Serial.print(" Next sentence millis: "); Serial.println(next_sentence);
